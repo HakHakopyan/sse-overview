@@ -15,6 +15,13 @@ function connect() {
             printState(eventSource.readyState);
             setConnected(true);
         };
+        eventSource.onerror = function (event) {
+            console.log('-> There is Error happens')
+            printState(event.target.readyState);
+            if (event.target.readyState !== EventSource.CLOSED) {
+                disconnect(event.target);
+            }
+        };
     }
 }
 
@@ -26,20 +33,19 @@ function printState(state) {
     } else if (state === EventSource.CLOSED) { //   2
         console.log('connection state: ' + eventSource.readyState + ' -> connection closed.');
     }
-
 }
 
-function disconnect() {
-    if (eventSource !== null) {
-        eventSource.close();
+function  disconnect(es) {
+    if (es !== null) {
+        es.close();
         eventSource = null;
     }
     setConnected(false);
-    console.log("Disconnected");
+    console.log("-> connection closed");
 }
 
 $(function () {
     $("form").on('submit', function (e) {e.preventDefault();});
     $( "#connect" ).click(function() { connect(); });
-    $( "#disconnect" ).click(function() { disconnect(); });
+    $( "#disconnect" ).click(function() { disconnect(eventSource); });
 });
