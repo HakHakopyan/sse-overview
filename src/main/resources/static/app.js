@@ -9,18 +9,22 @@ function connect() {
     if (window.EventSource == null) {
         alert('The browser does not support Server-Sent Events');
     } else {
-        eventSource = new EventSource("/api/connect");
+        eventSource = new EventSource("/api/info");
         printState(eventSource.readyState);
         eventSource.onopen = function () {
             printState(eventSource.readyState);
             setConnected(true);
         };
         eventSource.onmessage = (event) => {
-            console.log('-> Message from server: ' + event.data)
+            console.log('-> id: ' + event.lastEventId + ', data: ' + event.data)
+            if (event.data.endsWith('.')) {
+                disconnect(event.target)
+            }
         }
         eventSource.onerror = function (event) {
-            console.log('-> There is Error happens')
+            console.log('-> There is Error happens. Last Event ID = ' + event.lastEventId)
             printState(event.target.readyState);
+            // if (event.target.readyState === EventSource.OPEN) {
             if (event.target.readyState !== EventSource.CLOSED) {
                 disconnect(event.target);
             }
