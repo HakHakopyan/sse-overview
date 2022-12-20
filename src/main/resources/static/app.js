@@ -15,6 +15,9 @@ function connect() {
             printState(eventSource.readyState);
             setConnected(true);
         };
+        eventSource.onmessage = (event) => {
+            console.log('-> Message from server: ' + event.data)
+        }
         eventSource.onerror = function (event) {
             console.log('-> There is Error happens')
             printState(event.target.readyState);
