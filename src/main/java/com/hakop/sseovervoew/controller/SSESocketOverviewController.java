@@ -1,52 +1,61 @@
 package com.hakop.sseovervoew.controller;
 
+import com.hakop.sseovervoew.cache.SseSessionCache;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("api")
+@RequiredArgsConstructor
 public class SSESocketOverviewController {
-
-    private final ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
-    private static final String[] REG_INFO = "This app describe SSE using simple registration model.".split(" ");
+    private final SseSessionCache sseSessionCache;
 
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping(path = "/info", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter info(@RequestHeader(name = "Last-Event-ID", required = false) String lastId) {
-        SseEmitter sseEmitter = new SseEmitter(TimeUnit.SECONDS.toMillis(2));
-        cachedThreadPool.execute(() -> {
-            try {
-                for (int i = parseLastId(lastId); i < REG_INFO.length; i++) {
-                    sseEmitter.send(
-                            SseEmitter.event()
-                                    .id(String.valueOf(i))
-                                    .data(REG_INFO[i])
-                    );
-                    TimeUnit.SECONDS.sleep(1);
-                }
-                sseEmitter.complete();
-            } catch (Exception e) {
-                sseEmitter.completeWithError(e);
-            }
-        });
+    @GetMapping(path = "register/{name}/start/", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter register(@PathVariable("name") String name) throws IOException {
+        final String requestId = UUID.randomUUID().toString();
+        SseEmitter sseEmitter = sseSessionCache.create(requestId);
+        sseEmitter.send(
+                SseEmitter.event()
+                        .name("REG_START")
+                        .id(requestId)
+                        .data(String.format("%s your registration is stored.", name))
+        );
         return sseEmitter;
     }
 
-    private int parseLastId(String lastId) {
-        try {
-            return Integer.parseInt(lastId) + 1;
-        } catch (NumberFormatException e) {
-            return 0;
+    @PostMapping("register/result")
+    public String result(@RequestParam("request_id") final String requestId,
+                         @RequestParam("result") final boolean result) {
+        SseEmitter sseEmitter = sseSessionCache.release(requestId);
+        if (sseEmitter == null) {
+            return "Such registration request not exist";
         }
+        try {
+            sseEmitter.send(SseEmitter.event()
+                    .id(requestId)
+                    .name("REG_RESULT")
+                    .data(String.format("Registration result is: %s", result ? "success" : "denied"))
+            );
+        } catch (Exception ex) {
+            log.error("Error on sending Registration result with reqID {}: {}", requestId, ex.getMessage());
+            return "There is Error on user notification: " + ex.getMessage();
+        }
+        sseEmitter.complete();
+        return "User success notified.";
     }
 }

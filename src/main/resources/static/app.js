@@ -1,35 +1,53 @@
 var eventSource = null;
 
 function setConnected(connected) {
-    $("#connect").prop("disabled", connected);
+    $("#register").prop("disabled", connected);
     $("#disconnect").prop("disabled", !connected);
+    if (connected) {
+        $("#process_request").show();
+        $("#request_answer").show();
+    } else {
+        $("#process_request").hide();
+        // $("#request_answer").hide();
+        $("#process").html("");
+        // $("#answer").html("");
+    }
 }
 
-function connect() {
+function register() {
     if (window.EventSource == null) {
         alert('The browser does not support Server-Sent Events');
+    } else if (!$("#name").val().length) {
+        alert('User OID is empty, please fill it.');
     } else {
-        eventSource = new EventSource("/api/info");
-        printState(eventSource.readyState);
+        eventSource = new EventSource("/api/register/" + $("#name").val() + "/start/");
         eventSource.onopen = function () {
             printState(eventSource.readyState);
             setConnected(true);
         };
-        eventSource.onmessage = (event) => {
-            console.log('-> id: ' + event.lastEventId + ', data: ' + event.data)
-            if (event.data.endsWith('.')) {
-                disconnect(event.target)
-            }
-        }
+        eventSource.addEventListener("REG_START", (regStartInfo) => {
+            showRegStartInfo(`reqID: ${regStartInfo.lastEventId}. ${regStartInfo.data}`);
+        });
+        eventSource.addEventListener("REG_RESULT", (regResultInfo) => {
+            showRegResultInfo(`reqID: ${regResultInfo.lastEventId}: ${regResultInfo.data}`);
+            disconnect(regResultInfo.target);
+        });
         eventSource.onerror = function (event) {
-            console.log('-> There is Error happens. Last Event ID = ' + event.lastEventId)
+            console.log('-> There is Error happens. Last Event ID = ' + event.target.lastEventId)
             printState(event.target.readyState);
-            // if (event.target.readyState === EventSource.OPEN) {
-            if (event.target.readyState !== EventSource.CLOSED) {
+            if (event.target.readyState === EventSource.OPEN) {
                 disconnect(event.target);
             }
         };
     }
+}
+
+function showRegStartInfo(content) {
+    $("#process").append("<tr><td>" + content + "</td></tr>");
+}
+
+function showRegResultInfo(content) {
+    $("#answer").append("<tr><td>" + content + "</td></tr>");
 }
 
 function printState(state) {
@@ -42,7 +60,7 @@ function printState(state) {
     }
 }
 
-function  disconnect(es) {
+function disconnect(es) {
     if (es !== null) {
         es.close();
         eventSource = null;
@@ -52,7 +70,8 @@ function  disconnect(es) {
 }
 
 $(function () {
-    $("form").on('submit', function (e) {e.preventDefault();});
-    $( "#connect" ).click(function() { connect(); });
-    $( "#disconnect" ).click(function() { disconnect(eventSource); });
+    $("form").on('submit', function(e) { e.preventDefault(); });
+
+    $("#register").click(function() { register(); });
+    $("#disconnect").click(function() { disconnect(); });
 });
