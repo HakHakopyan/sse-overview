@@ -3,9 +3,11 @@ package com.hakop.sseovervoew.cache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -49,5 +51,21 @@ public class SseSessionCache {
             sseEmitterMap.remove(key);
         }
         return emitter;
+    }
+
+    @Scheduled(fixedDelayString = "${sse.session.notify:30}000")
+    public void removeExpiredSseSessions(){
+        sseEmitterMap.keySet().forEach(requestId -> {
+            try {
+                sseEmitterMap.get(requestId).send(SseEmitter.event()
+                        .name("REG_START")
+                        .id(requestId)
+                        .data("The result of your registration will be ready soon :)")
+                );
+            } catch (IOException e) {
+                log.error("There is problem to send message for Request {}: {}", requestId, e.getMessage());
+                throw new RuntimeException(e);
+            }
+        });
     }
 }
