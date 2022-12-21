@@ -26,7 +26,10 @@ public class SseSessionCache {
             sseEmitterMap.remove(key);
         }
         SseEmitter newEmitter = new SseEmitter(TimeUnit.SECONDS.toMillis(sseTtlInSeconds)); // new SseEmitter(Long.MAX_VALUE);
+
         newEmitter.onTimeout(newEmitter::complete);
+        newEmitter.onCompletion(() -> sseEmitterMap.remove(key));
+
         log.info("SSE Session with key {} created.", key);
         sseEmitterMap.put(key, newEmitter);
         return newEmitter;
