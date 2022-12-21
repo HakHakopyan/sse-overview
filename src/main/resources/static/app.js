@@ -32,6 +32,9 @@ function register() {
             showRegResultInfo(`reqID: ${regResultInfo.lastEventId}: ${regResultInfo.data}`);
             disconnect(regResultInfo.target);
         });
+        eventSource.onmessage = (event) => {
+            console.log(`reqID: ${event.lastEventId}: ${event.data}`);
+        }
         eventSource.onerror = function (event) {
             console.log('-> There is Error happens. Last Event ID = ' + event.target.lastEventId)
             printState(event.target.readyState);

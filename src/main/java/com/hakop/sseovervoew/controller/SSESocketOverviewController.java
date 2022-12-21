@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -22,32 +23,40 @@ import java.util.UUID;
 @RequestMapping("api")
 @RequiredArgsConstructor
 public class SSESocketOverviewController {
+
     private final SseSessionCache sseSessionCache;
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping(path = "register/{name}/start/", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter register(@PathVariable("name") String name) throws IOException {
-        final String requestId = UUID.randomUUID().toString();
+    public SseEmitter register(@PathVariable("name") String name,
+                               @RequestHeader(name = "Last-Event-ID", required = false) String lastId) throws IOException {
+        final String requestId = lastId == null ? UUID.randomUUID().toString() : lastId;
         SseEmitter sseEmitter = sseSessionCache.create(requestId);
-        sseEmitter.send(
-                SseEmitter.event()
-                        .name("REG_START")
-                        .id(requestId)
-                        .data(String.format("%s your registration is stored.", name))
-        );
+        if (lastId == null) {
+            sseEmitter.send(SseEmitter.event()
+                    .name("REG_START")
+                    .id(requestId)
+                    .data(String.format("%s your registration is stored.", name))
+            );
+        } else {
+            sseEmitter.send(SseEmitter.event()
+                    .id(lastId)
+                    .data("Connection is reestablished.")
+            );
+        }
         return sseEmitter;
     }
 
     @PostMapping("register/result")
     public String result(@RequestParam("request_id") final String requestId,
                          @RequestParam("result") final boolean result) {
-        SseEmitter sseEmitter = sseSessionCache.release(requestId);
+        SseEmitter sseEmitter = sseSessionCache.release(requestId.trim());
         if (sseEmitter == null) {
             return "Such registration request not exist";
         }
         try {
             sseEmitter.send(SseEmitter.event()
-                    .id(requestId)
+                    .id(requestId.trim())
                     .name("REG_RESULT")
                     .data(String.format("Registration result is: %s", result ? "success" : "denied"))
             );

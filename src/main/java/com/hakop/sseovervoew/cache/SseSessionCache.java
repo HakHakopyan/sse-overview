@@ -22,11 +22,11 @@ public class SseSessionCache {
     public SseEmitter create(String key) {
         SseEmitter existingEmitter = sseEmitterMap.get(key);
         if (existingEmitter != null) {
-            existingEmitter.complete();
             log.info("SSE Session with key {} already exist. Existed completed and removed. New one created.", key);
             sseEmitterMap.remove(key);
         }
         SseEmitter newEmitter = new SseEmitter(TimeUnit.SECONDS.toMillis(sseTtlInSeconds)); // new SseEmitter(Long.MAX_VALUE);
+        newEmitter.onTimeout(newEmitter::complete);
         log.info("SSE Session with key {} created.", key);
         sseEmitterMap.put(key, newEmitter);
         return newEmitter;
